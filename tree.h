@@ -42,13 +42,28 @@ Node<T> *CreateNode(T _value, Node<T> *_left = nullptr, Node<T> *_right = nullpt
 }
 
 template <typename T>
+void Tree_connect(Node<T>* _parent, Node<T>* _left_son = nullptr, Node<T>* _right_son = nullptr) {
+    if (_parent == nullptr) {
+        return ;
+    }
+    if (_left_son != nullptr) {
+        _parent->left = _left_son;
+        _left_son->parent = _parent;
+    }
+    if (_right_son != nullptr) {
+        _parent->right = _right_son;
+        _right_son->parent = _parent;
+    }
+}
+
+template <typename T>
 Node<T>* Tree_copy(Node<T>* root) {
     if (root == nullptr) {
         return nullptr;
     }
     Node<T>* new_left = Tree_copy(root->left);
     Node<T>* new_right = Tree_copy(root->right);
-    Node<T>* result = CreateNode(root->flag, root->value, new_left, new_right);
+    Node<T>* result = CreateNode(root->value, new_left, new_right);
 
     return result;
 }
@@ -62,4 +77,15 @@ void LNR(Node<T>* _current_node, Func _f_) {//std::function
     LNR(_current_node->left, _f_);
     _f_(_current_node);
     LNR(_current_node->right, _f_);
+}
+
+template <typename T, typename  Func>
+void NLR(Node<T>* _current_node, Func _f_) {//std::function
+    if (_current_node == nullptr) {
+        return ;
+    }
+
+    _f_(_current_node);
+    NLR(_current_node->left, _f_);
+    NLR(_current_node->right, _f_);
 }

@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cassert>
 #include <deque>
+#include <cmath>
 
 #define Node Node<element>
 #define $lp left->parent
@@ -11,23 +12,133 @@
 #define $flag value.flag
 #define $value value.value
 
+#define $LOG$ 1
+//#define $DETAILED_LOG$ 2
+static size_t counter = 0;
+
 Expression::Expression()
-: root_orig(nullptr) {
+: root_orig(nullptr)
+, num_name(counter++)
+{
+#ifdef $LOG$
+    makeLogEntry("*(Expression #" + std::to_string(num_name) + ") Entry default constructor", __LINE__);
+#endif
+}
+
+Expression::Expression(const std::string& _str)
+: num_name(counter++)
+, root_orig(nullptr)
+{
+#ifdef $LOG$
+    makeLogEntry("*(Expression #" + std::to_string(num_name) + ") Entry constructor 'Expression(const std::string &)'", __LINE__);
+#endif
+    std::stringstream in(_str);
+    ReadExpression(in);
 }
 
 Expression::Expression(std::istream &stream)
-: root_orig(nullptr) {
+: root_orig(nullptr)
+, num_name(counter++)
+{
+#ifdef $LOG$
+    makeLogEntry("*(Expression #" + std::to_string(num_name) + ") Entry constructor 'Expression(std::istream &)'", __LINE__);
+#endif
     ReadExpression(stream);
 }
 
+Expression::Expression(const Expression &that)
+: root_orig(Tree_copy(that.root_orig))
+, var_values(that.var_values)
+, var_data(that.var_data)
+, num_name(counter++)
+{
+#ifdef $LOG$
+    makeLogEntry("*(Expression #" + std::to_string(num_name) + ") Entry copy constructor. Copy of (Expression #"
+                    + std::to_string(that.num_name) + ")", __LINE__);
+#endif
+}
+
+Expression::Expression(Expression&& that)
+: root_orig(that.root_orig)
+, var_data(std::move(that.var_data))
+, var_values(std::move(that.var_values))
+, num_name(counter++)
+{
+#ifdef $LOG$
+    makeLogEntry("*(Expression #" + std::to_string(num_name) + ") Entry move constructor", __LINE__);
+#endif
+    that.root_orig = nullptr;
+}
+
+Expression::~Expression() {
+#ifdef $LOG$
+    makeLogEntry("*(Expression #" + std::to_string(num_name) + ") Entry destructor", __LINE__);
+#endif
+    delete root_orig;
+}
+
+
+Expression &Expression::operator=(Expression that) {
+#ifdef $LOG$
+    makeLogEntry("operator '=': (Expression #" + std::to_string(num_name) + ") = (" + "(Expression #" + std::to_string(that.num_name) + ")", __LINE__);
+#endif
+
+    std::swap(root_orig, that.root_orig);
+    var_data = std::move(that.var_data);
+    var_values = std::move(that.var_values);
+
+    return *this;
+}
+Expression &Expression::operator+=(const Expression &that) {
+#ifdef $LOG$
+    makeLogEntry("operator '+=': (Expression #" + std::to_string(num_name) + ") += (" + "(Expression #" + std::to_string(that.num_name) + ")", __LINE__);
+#endif
+    if (that.root_orig != nullptr) {
+        root_orig = CreateNode(element{DOUBLE_OPERATOR, OP_ADD}, root_orig, Tree_copy(that.root_orig));
+
+        NLR(root_orig->right, [&](Node* nod) {
+            if (nod->$flag == VAR) {
+                nod->$value = _FixationVarName_(var_data, that.var_data[nod->$value]);
+            }
+        });
+    }
+
+    return *this;
+}
+Expression operator+(const Expression& lhs, const Expression& rhs) {
+#ifdef $LOG$
+    makeLogEntry("operator '+(const &, const &)': (Expression #" + std::to_string(lhs.num_name) + ") + (" + "(Expression #" + std::to_string(rhs.num_name) + ")", __LINE__);
+#endif
+
+    Expression tmp(lhs);
+    tmp += rhs;
+
+    return tmp;
+}
+Expression operator+(Expression&& lhs, const Expression& rhs) {
+#ifdef $LOG$
+    makeLogEntry("operator '+( &&, const &)': (Expression #" + std::to_string(lhs.num_name) + ") + (" + "(Expression #" + std::to_string(rhs.num_name) + ")", __LINE__);
+#endif
+
+    lhs += rhs;
+    return std::move(lhs);
+}
 
 void Expression::ReadExpression(std::istream &stream) {
+#ifdef $LOG$
+        makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry ReadExpression(std::istream &stream)", __LINE__);
+#endif
     delete root_orig;
 
     std::vector<element> exp = _preprocessor_for_read_(stream);
     root_orig = _read_(exp);
+
+    UpValueVar({});
 }
 std::vector<element> Expression::_preprocessor_for_read_(std::istream &stream) {
+#ifdef $DETAILED_LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry _preprocessor_for_read_(std::istream &stream)", __LINE__);
+#endif
     std::vector<element> result;
 
     char current_sign = stream.peek();
@@ -99,6 +210,10 @@ bool Expression::_is_digit_(const std::string &_str, double &_result) {
 }
 
 uint32_t Expression::_FixationVarName_(const std::vector<std::string>& _vars, const std::string& _value) {
+#ifdef $DETAILED_LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry _FixationVarName_(const std::vector<std::string>& _vars, const std::string& _value)", __LINE__);
+#endif
+
     auto it = std::find(_vars.begin(), _vars.end(), _value);
     if (it != var_data.end()) {
         return it - var_data.begin();
@@ -116,6 +231,9 @@ uint32_t Expression::_FixationVarName_(const std::vector<std::string>& _vars, co
 }
 
 element Expression::_coder_operator_(const std::string &_str) {
+#ifdef $DETAILED_LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry _coder_operator_(const std::string &_str)", __LINE__);
+#endif
     auto it = oper_to_cod.find(_str);
 
     if (it == oper_to_cod.end()) {
@@ -129,6 +247,9 @@ element Expression::_coder_operator_(const std::string &_str) {
 
 
 Node *Expression::_read_(std::vector<element>& _str) {
+#ifdef $DETAILED_LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry _read_(std::vector<element>& _str)", __LINE__);
+#endif
     if (_str.empty()) {
         return nullptr;
     }
@@ -145,12 +266,20 @@ Node *Expression::_read_(std::vector<element>& _str) {
     else if (_str[0].flag == NOT_OPERATOR && _str[0].value == OPEN_BRACKET) {
         result = _read_brackets_case_(it_begin, it_end);
     }
+    else if (it_begin->flag == DOUBLE_OPERATOR && (it_begin->value == OP_SUB || it_begin->value == OP_ADD)) {
+        result = _read_add_or_sub_case_(it_begin, it_end, true);
+        assert(result != nullptr);
+    }
     else {
         throw std::invalid_argument("non-violent record of expression");
     }
     return result;
 }
 Node* Expression::_read_num_or_var_case_(std::vector<element>::iterator it_begin, std::vector<element>::iterator it_end) {
+#ifdef $DETAILED_LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry _read_num_or_var_case_", __LINE__);
+#endif
+
     Node* num = CreateNode(*it_begin);
     Node* result = nullptr;
 
@@ -166,7 +295,7 @@ Node* Expression::_read_num_or_var_case_(std::vector<element>::iterator it_begin
             result = _read_add_or_sub_case_(new_begin, it_end);
             assert(result != nullptr);
 
-            result->left = num;
+            Tree_connect(result, num);
             num = nullptr;
         }
         else if (new_begin->value == OP_MUL || new_begin->value == OP_DIV) {
@@ -175,16 +304,10 @@ Node* Expression::_read_num_or_var_case_(std::vector<element>::iterator it_begin
 
             num = nullptr;
         }
-        /*else if (new_begin->value == OP_EXPONENT) {
-//            result = _read_exponent_case_(new_begin, it_end);
+        else if (new_begin->value == OP_EXPONENT) {
+            result = _read_exponent_case_(new_begin, it_end, num);
             assert(result != nullptr);
-
-            if (result->$flag == DOUBLE_OPERATOR && result->$value == OP_EXPONENT) {
-
-            } else if (result->left->$flag == DOUBLE_OPERATOR && result->left->$value == OP_EXPONENT) {
-
-            } else { assert(0); }
-        }*/
+        }
         else { assert(0); }
     }
     else if (new_begin->flag == NOT_OPERATOR && new_begin->value == CLOSE_BRACKET) {
@@ -195,9 +318,18 @@ Node* Expression::_read_num_or_var_case_(std::vector<element>::iterator it_begin
 
     return result;
 }
-Node* Expression::_read_add_or_sub_case_(std::vector<element>::iterator it_begin, std::vector<element>::iterator it_end) {
+Node* Expression::_read_add_or_sub_case_(std::vector<element>::iterator it_begin, std::vector<element>::iterator it_end, bool _unary) {
+#ifdef $DETAILED_LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry _read_add_or_sub_case_", __LINE__);
+#endif
+
     Node* result = CreateNode(*it_begin);
     Node* num = nullptr;
+
+    if (_unary) {
+        result->$flag = BIN_OPERATOR;
+        result->$value = (result->$value == OP_ADD) ? UN_PLUS : UN_MINUS;
+    }
 
     auto new_begin = it_begin;
     if (it_begin != it_end) {
@@ -207,15 +339,18 @@ Node* Expression::_read_add_or_sub_case_(std::vector<element>::iterator it_begin
     }
 
     if (new_begin->flag == NUM || new_begin->flag == VAR) {
-        result->right = _read_num_or_var_case_(new_begin, it_end);
+        Tree_connect(result, (Node*) nullptr, _read_num_or_var_case_(new_begin, it_end));
+
         assert(result->right != nullptr);
     }
     else if (new_begin->flag == NOT_OPERATOR && new_begin->value == OPEN_BRACKET) {
-        result->right = _read_brackets_case_(new_begin, it_end);
+        Tree_connect(result, (Node*) nullptr, _read_brackets_case_(new_begin, it_end));
+
         assert(result->right != nullptr);
     }
     else if (new_begin->flag == BIN_OPERATOR) {
-        result->right = _read_binary_case_(new_begin, it_end);
+        Tree_connect(result, (Node*) nullptr, _read_binary_case_(new_begin, it_end));
+
         assert(result->right != nullptr);
     }
     else { throw std::runtime_error("in _read_add_or_sub_case_, received: " + std::to_string(new_begin->flag)); }
@@ -223,6 +358,10 @@ Node* Expression::_read_add_or_sub_case_(std::vector<element>::iterator it_begin
     return result;
 }
 Node* Expression::_read_mul_or_div_case_(std::vector<element>::iterator it_begin, std::vector<element>::iterator it_end, Node* _left) {
+#ifdef $DETAILED_LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry _read_mul_or_div_case_", __LINE__);
+#endif
+
     Node* result = CreateNode(*it_begin, _left);
     Node* num = nullptr;
 
@@ -238,19 +377,23 @@ Node* Expression::_read_mul_or_div_case_(std::vector<element>::iterator it_begin
         assert(tmp != nullptr);
 
         if (tmp->$flag == DOUBLE_OPERATOR && (tmp->$value == OP_ADD || tmp->$value == OP_SUB)) {
-            result->right = tmp->left;
-            tmp->left = result;
+            Tree_connect(result, (Node*) nullptr, tmp->left);
+            //result->right = tmp->left;
+            Tree_connect(tmp, result);
+            //tmp->left = result;
             result = tmp;
         }
         else {
-            result->right = tmp;
+            Tree_connect(result, (Node*) nullptr, tmp);
+            //result->right = tmp;
         }
     }
     else if (new_begin->flag == NOT_OPERATOR && new_begin->value == OPEN_BRACKET) {
         auto new_end = _find_closing_bracket_(new_begin, it_end + 1);
         assert(new_end != it_end + 1);
 
-        result->right = _read_brackets_case_(new_begin, new_end);
+        Tree_connect(result, (Node*) nullptr, _read_brackets_case_(new_begin, new_end));
+        //result->right = _read_brackets_case_(new_begin, new_end);
         assert(result->right != nullptr);
 
         //после скобок
@@ -262,15 +405,22 @@ Node* Expression::_read_mul_or_div_case_(std::vector<element>::iterator it_begin
                     Node* tmp = _read_add_or_sub_case_(new_begin, it_end);
                     assert(tmp != nullptr);
 
-                    tmp->left = result;
+                    Tree_connect(tmp, (Node*) nullptr, result);
+                    //tmp->left = result;
                     result = tmp;
                     tmp = nullptr;
                 }
                 else if (new_begin->value == OP_MUL || new_begin->value == OP_DIV) {
                     result = _read_mul_or_div_case_(new_begin, it_end, result);
                     assert(result != nullptr);
-
-                } else { throw std::runtime_error("in bracket case(after) value:" + std::to_string(new_begin->value)); }
+                }
+                else if (new_begin->value == OP_EXPONENT) {
+                    Tree_connect(result, (Node*) nullptr, _read_exponent_case_(new_begin, it_end, result->right));
+                    //Node* exp = _read_exponent_case_(new_begin, it_end, result->right);
+                    //assert(exp != nullptr);
+                    //result->right = exp;
+                }
+                else { throw std::runtime_error("in bracket case(after) value:" + std::to_string(new_begin->value)); }
             }else { throw std::runtime_error("in bracket case(after) flag:" + std::to_string(new_begin->flag)); }
         }
     }
@@ -279,19 +429,27 @@ Node* Expression::_read_mul_or_div_case_(std::vector<element>::iterator it_begin
         assert(tmp != nullptr);
 
         if (tmp->$flag == DOUBLE_OPERATOR && (tmp->$value == OP_ADD || tmp->$value == OP_SUB)) {
-            result->right = tmp->left;
-            tmp->left = result;
+            Tree_connect(result, (Node*) nullptr, tmp->left);
+            Tree_connect(tmp, result);
             result = tmp;
+            //result->right = tmp->left;
+            //tmp->left = result;
+            //result = tmp;
         }
         else {
-            result->right = tmp;
+            Tree_connect(result, (Node*) nullptr, tmp);
+            //result->right = tmp;
         }
     }
     else { throw std::runtime_error("in _read_add_or_sub_case_, received: " + std::to_string(new_begin->flag)); }
 
     return result;
 }
-Node* Expression::_read_brackets_case_(std::vector<element>::iterator it_begin, std::vector<element>::iterator it_end) {
+Node* Expression::_read_brackets_case_  (std::vector<element>::iterator it_begin, std::vector<element>::iterator it_end) {
+#ifdef $DETAILED_LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry _read_brackets_case_", __LINE__);
+#endif
+
     auto new_begin = it_begin;
     if (it_begin != it_end) {
         new_begin++;
@@ -320,6 +478,10 @@ Node* Expression::_read_brackets_case_(std::vector<element>::iterator it_begin, 
         inside_brackets = _read_brackets_case_(new_begin, end_bracket);
         assert(inside_brackets != nullptr);
     }
+    else if (new_begin->flag == DOUBLE_OPERATOR && (new_begin->value == OP_SUB || new_begin->value == OP_ADD)) {
+        inside_brackets = _read_add_or_sub_case_(new_begin, end_bracket, true);
+        assert(inside_brackets != nullptr);
+    }
     else { throw std::runtime_error("in bracket case(inside):" + std::to_string(new_begin->flag)); }
 
     //после скобок
@@ -346,12 +508,22 @@ Node* Expression::_read_brackets_case_(std::vector<element>::iterator it_begin, 
                 assert(result != nullptr);
 
                 inside_brackets = nullptr;
-            } else { throw std::runtime_error("in bracket case(after) value:" + std::to_string(new_begin->value)); }
+            } else if (new_begin->value == OP_EXPONENT) {
+                result = _read_exponent_case_(new_begin, it_end, inside_brackets);
+                assert(result != nullptr);
+
+                inside_brackets = nullptr;
+            }
+            else { throw std::runtime_error("in bracket case(after) value:" + std::to_string(new_begin->value)); }
         }else { throw std::runtime_error("in bracket case(after) flag:" + std::to_string(new_begin->flag)); }
     }
     return result;
 }
-Node* Expression::_read_binary_case_(std::vector<element>::iterator it_begin, std::vector<element>::iterator it_end) {
+Node* Expression::_read_binary_case_ (std::vector<element>::iterator it_begin, std::vector<element>::iterator it_end) {
+#ifdef $DETAILED_LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry _read_binary_case_", __LINE__);
+#endif
+
     Node* bin_operator = CreateNode(*it_begin);
 
     std::vector<element>::iterator new_begin;
@@ -406,8 +578,72 @@ Node* Expression::_read_binary_case_(std::vector<element>::iterator it_begin, st
 
     return result;
 }
+Node* Expression::_read_exponent_case_  (std::vector<element>::iterator it_begin, std::vector<element>::iterator it_end, Node* _left) {
+#ifdef $DETAILED_LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry _read_exponent_case_", __LINE__);
+#endif
 
+    Node* exp = CreateNode(*it_begin, _left);
+    Node* result = nullptr;
+
+    auto new_begin = it_begin;
+    if (it_begin != it_end) {
+        new_begin++;
+    } else {
+        throw std::runtime_error("Expression ends with Double operator '^'.");
+    }
+
+    //exponent
+    if (new_begin->flag == NUM || new_begin->flag == VAR) {
+        exp->right = CreateNode(*new_begin);
+    }
+    else if (new_begin->flag == BIN_OPERATOR) {
+        auto end_bin = _find_closing_bracket_(new_begin + 1, it_end);
+
+        exp->right = _read_binary_case_(new_begin, end_bin);
+        new_begin = end_bin;
+    }
+    else if (new_begin->flag == NOT_OPERATOR && new_begin->value == OPEN_BRACKET) {
+        auto end_br = _find_closing_bracket_(new_begin, it_end);
+
+        exp->right = _read_brackets_case_(new_begin, end_br);
+        new_begin = end_br;
+    }
+    else { throw std::runtime_error("after operator '^' received: flag(" + std::to_string(new_begin->flag)
+                                    + "), value(" + std::to_string(new_begin->value) + ")"); }
+
+    //after
+    if (new_begin != it_end) {
+        new_begin++;
+
+        if (new_begin->flag == DOUBLE_OPERATOR) {
+            if (new_begin->value == OP_ADD || new_begin->value == OP_SUB) {
+                result = _read_add_or_sub_case_(new_begin, it_end);
+                assert(result != nullptr);
+
+                result->left = exp;
+                exp = nullptr;
+            }
+            else if (new_begin->value == OP_MUL || new_begin->value == OP_DIV) {
+                result = _read_mul_or_div_case_(new_begin, it_end, exp);
+                assert(result != nullptr);
+                exp = nullptr;
+            }
+            else { assert(0); }
+        }
+        else { assert(0); }
+    }
+    else {
+        result = exp;
+    }
+
+    return result;
+}
 void Expression::clear() {
+#ifdef $LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry clear()", __LINE__);
+#endif
+
     delete root_orig;
     root_orig = nullptr;
 
@@ -417,9 +653,16 @@ void Expression::clear() {
 
 
 void Expression::OutExpressionTree(std::ostream &_stream) const {
+#ifdef $LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry OutExpressionTree()", __LINE__);
+#endif
     LNR_for_output_tree(root_orig, _stream);
 }
 void Expression::LNR_for_output_tree(Node *nod, std::ostream &stream) const {
+#ifdef $DETAILED_LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry LNR_for_output_tree", __LINE__);
+#endif
+
     if (nod == nullptr) {
         return ;
     }
@@ -452,9 +695,17 @@ void Expression::LNR_for_output_tree(Node *nod, std::ostream &stream) const {
 }
 
 void Expression::OutExpression(std::ostream &stream) const {
+#ifdef $LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry OutExpression", __LINE__);
+#endif
+
     LNR_for_output_without_br(root_orig, stream);
 }
 void Expression::LNR_for_output_without_br(Node *nod, std::ostream &stream) const {
+#ifdef $DETAILED_LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry LNR_for_output_without_br", __LINE__);
+#endif
+
     if (nod->left == nullptr || nod->right == nullptr) {
         if (nod->left == nullptr && nod->right == nullptr) {
             if (nod->$flag == VAR) {
@@ -510,10 +761,17 @@ void Expression::LNR_for_output_without_br(Node *nod, std::ostream &stream) cons
 }
 
 void Expression::OutExpressionTeX(std::ostream &stream) const {
+#ifdef $LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry OutExpressionTeX", __LINE__);
+#endif
 
     _for_output_TeX_(root_orig, stream);
 }
 void Expression::_for_output_TeX_(Node* nod, std::ostream &stream) const {
+#ifdef $DETAILED_LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry _for_output_TeX_", __LINE__);
+#endif
+
     if (nod == nullptr) {
         return ;
     }
@@ -528,7 +786,8 @@ void Expression::_for_output_TeX_(Node* nod, std::ostream &stream) const {
         if (nod->$value == OP_MUL || nod->$value == OP_ADD || nod->$value == OP_SUB) {
             bool br_is_open = false;
 
-            if (nod->left->$flag == DOUBLE_OPERATOR && oper_to_priority.at(nod->$value) > oper_to_priority.at(nod->left->$value)) {
+            if (nod->left->$flag == DOUBLE_OPERATOR && oper_to_priority.at(nod->$value) > oper_to_priority.at(nod->left->$value)
+                || (nod->left->$flag == BIN_OPERATOR && nod->left->$value == UN_MINUS)) {
                 stream << "\\left(";
                 br_is_open = true;
             }
@@ -573,6 +832,13 @@ void Expression::_for_output_TeX_(Node* nod, std::ostream &stream) const {
                     _for_output_TeX_(nod->right, stream);
                     stream << '}';
                 }
+                else if (nod->left->$value == UN_MINUS) {
+                    stream << "\\left(";
+                    _for_output_TeX_(nod->left, stream);
+                    stream << "\\right) ^ {";
+                    _for_output_TeX_(nod->right, stream);
+                    stream << '}';
+                }
                 else {
                     stream << '\\' << cod_to_oper.at(nod->left->$value);
                     stream << "^{";
@@ -598,6 +864,19 @@ void Expression::_for_output_TeX_(Node* nod, std::ostream &stream) const {
             _for_output_TeX_(nod->right, stream);
             stream << '}';
         }
+        else if (nod->$value == UN_MINUS) {
+
+            if (nod->right->$flag == NUM || nod->right->$flag == VAR) {
+                stream << '-';
+                _for_output_TeX_(nod->right, stream);
+            }
+            else {
+                stream << "-\\left(";
+                _for_output_TeX_(nod->right, stream);
+                stream << "\\right)";
+            }
+
+        }
         else {
             stream << "\\" << cod_to_oper.at(nod->$value) << "\\left(";
             _for_output_TeX_(nod->right, stream);
@@ -607,6 +886,288 @@ void Expression::_for_output_TeX_(Node* nod, std::ostream &stream) const {
 
 
 }
+
+std::vector<element>::iterator
+Expression::_find_closing_bracket_(std::vector<element>::iterator it_begin, std::vector<element>::iterator it_end) {
+#ifdef $DETAILED_LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry _find_closing_bracket_", __LINE__);
+#endif
+
+    std::vector<element>::iterator end_bracket;
+
+    int count_brackets = 0; //считая первую скобку
+    end_bracket = std::find_if(it_begin, it_end, [&count_brackets](const element &x) {
+        if (x.flag == NOT_OPERATOR && x.value == OPEN_BRACKET) {
+            count_brackets++;
+        }
+        if (x.flag == NOT_OPERATOR && x.value == CLOSE_BRACKET) {
+            count_brackets--;
+        }
+        return count_brackets == 0;
+    });
+
+    return end_bracket;
+}
+
+double Expression::calculate(const std::map<std::string, int> &_vars) {
+#ifdef $LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry calculate", __LINE__);
+#endif
+    UpValueVar(_vars);
+
+    return calculate();
+}
+void Expression::UpValueVar(const std::map<std::string, int> &_vars) {
+#ifdef $LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry UpValueVar", __LINE__);
+#endif
+
+    int i = 0;
+    for (const auto& var : var_data) {
+        auto it = _vars.find(var);
+
+        if (it != _vars.end()) {
+            var_values[i] = it->second;
+        }
+        else {
+            var_values[i];
+        }
+        i++;
+    }
+}
+double Expression::calculate() const {
+#ifdef $LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry calculate", __LINE__);
+#endif
+
+    return _rec_calculate_(root_orig);
+}
+double Expression::_rec_calculate_(Node* root) const {
+#ifdef $DETAILED_LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry _rec_calculate_", __LINE__);
+#endif
+
+    if (root == nullptr) {
+        return 0;
+    }
+
+    double result = 0;
+
+    if (root->$flag == NUM) {
+        result = root->$value;
+    }
+    else if (root->$flag == VAR) {
+        result = var_values.at(root->$value);
+    }
+    else if (root->$flag == DOUBLE_OPERATOR) {
+
+        if (root->$value == OP_SUB) {
+            result = _rec_calculate_(root->left) - _rec_calculate_(root->right);
+        }
+        else if (root->$value == OP_ADD) {
+            result = _rec_calculate_(root->left) + _rec_calculate_(root->right);
+        }
+        else if (root->$value == OP_MUL) {
+            result = _rec_calculate_(root->left) * _rec_calculate_(root->right);
+        }
+        else if (root->$value == OP_DIV) {
+            double left = _rec_calculate_(root->left);
+            double right = _rec_calculate_(root->right);
+
+            if (right != 0) {
+                result = left / right;
+            }
+            else {
+                std::ostringstream err;
+                OutExpression(err);
+                throw std::runtime_error("Division by zero!\n in: " + err.str());
+            }
+        }
+        else if (root->$value == OP_EXPONENT) {
+            result = std::pow(_rec_calculate_(root->left), _rec_calculate_(root->right));
+        }
+        else { assert(0); }
+    }
+    else if (root->$flag == BIN_OPERATOR) {
+        if (root->$value == OP_SIN) {
+            result = std::sin(_rec_calculate_(root->right));
+        }
+        else if (root->$value == OP_COS) {
+            result = std::cos(_rec_calculate_(root->right));
+        }
+        else if (root->$value == OP_TG) {
+            result = std::tan(_rec_calculate_(root->right));
+        }
+        else if (root->$value == OP_CTG) {
+            result = 1 / std::tan(_rec_calculate_(root->right));
+        }
+        else if (root->$value == OP_ASIN) {
+            result = std::asin(_rec_calculate_(root->right));
+        }
+        else if (root->$value == OP_ACOS) {
+            result = std::acos(_rec_calculate_(root->right));
+        }
+        else if (root->$value == OP_ATG) {
+            result = std::atan(_rec_calculate_(root->right));
+        }
+        else if (root->$value == OP_SH) {
+            result = std::sinh(_rec_calculate_(root->right));
+        }
+        else if (root->$value == OP_CH) {
+            result = std::cosh(_rec_calculate_(root->right));
+        }
+        else if (root->$value == OP_TH) {
+            result = std::tanh(_rec_calculate_(root->right));
+        }
+        else if (root->$value == OP_SQRT) {
+            result = std::sqrt(_rec_calculate_(root->right));
+        }
+        else if (root->$value == OP_LN) {
+            result = std::log(_rec_calculate_(root->right));
+        }
+        else { assert(0); }
+    }
+    return result;
+}
+
+Expression Expression::
+differentiation(const std::string &var_name) {
+#ifdef $LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry differentiation", __LINE__);
+#endif
+
+    auto it = std::find(var_data.begin(), var_data.end(), var_name);
+
+    if (it == var_data.end()) {
+        throw std::invalid_argument("Unknown variable: \" + var_name");
+    }
+    Expression res;
+    res.root_orig = _diff_(root_orig, it - var_data.begin());
+    res.var_data = var_data;
+    res.var_values = var_values;
+
+    return res;
+}
+
+Node* Expression::_diff_(Node* nod, int var_cod) {
+#ifdef $DETAILED_LOG$
+    makeLogEntry("(Expression #" + std::to_string(num_name) + ") Entry _diff_", __LINE__);
+#endif
+
+    Node* result = nullptr;
+
+    if (nod->$flag == NUM) {
+        result = CreateNode(element{NUM, 0});
+    }
+    else if (nod->$flag == VAR) {
+        result = CreateNode(element{NUM, double(nod->$value == var_cod)});
+    }
+    else if (nod->$flag == DOUBLE_OPERATOR) {
+        if (nod->$value == OP_ADD || nod->$value == OP_SUB) {
+            result = CreateNode(nod->value, _diff_(nod->left, var_cod), _diff_(nod->right, var_cod));
+        }
+        else if (nod->$value == OP_MUL) {
+            Node* left = CreateNode(element{DOUBLE_OPERATOR, OP_MUL}, _diff_(nod->left, var_cod), Tree_copy(nod->right));
+            Node* right = CreateNode(element{DOUBLE_OPERATOR, OP_MUL}, Tree_copy(nod->left), _diff_(nod->right, var_cod));
+
+            result = CreateNode(element{DOUBLE_OPERATOR, OP_ADD}, left, right);
+        }
+        else if (nod->$value == OP_DIV) {
+            Node* diff_numerator = CreateNode(element{DOUBLE_OPERATOR, OP_MUL}, _diff_(nod->left, var_cod), Tree_copy(nod->right));
+            Node* diff_denominator = CreateNode(element{DOUBLE_OPERATOR, OP_MUL}, Tree_copy(nod->left), _diff_(nod->right, var_cod));
+
+            Node* left = CreateNode(element{DOUBLE_OPERATOR, OP_SUB}, diff_numerator, diff_denominator);
+
+            Node* right = CreateNode(element{DOUBLE_OPERATOR, OP_EXPONENT}, Tree_copy(nod->right), CreateNode(element{NUM, 2}));
+
+            result = CreateNode(element{DOUBLE_OPERATOR, OP_DIV}, left, right);
+        }
+        else if (nod->$value == OP_EXPONENT) {
+            bool arg_const = _is_const_(nod->left, var_cod);
+            bool exp_const = _is_const_(nod->right, var_cod);
+
+            if (arg_const && exp_const) {
+                result = CreateNode(element{NUM, 0});
+            }
+            else if (!arg_const && exp_const) {
+
+                Node* new_exp = CreateNode(element{DOUBLE_OPERATOR, OP_SUB}, Tree_copy(nod->right), CreateNode(element{NUM, 1}));
+                new_exp = CreateNode(element{DOUBLE_OPERATOR, OP_EXPONENT}, Tree_copy(nod->left), new_exp);
+
+                result = CreateNode(element{DOUBLE_OPERATOR, OP_MUL}, Tree_copy(nod->right),
+                                    CreateNode(element{DOUBLE_OPERATOR, OP_MUL}, _diff_(nod->left, var_cod), new_exp));
+            }
+            else if (arg_const && !exp_const) {
+
+                Node* ln_arg = CreateNode(element{BIN_OPERATOR, OP_LN}, (Node*)nullptr, Tree_copy(nod->left));
+                Node* right = CreateNode(element{DOUBLE_OPERATOR, OP_MUL}, ln_arg, _diff_(nod->right, var_cod));
+
+                result = CreateNode(element{DOUBLE_OPERATOR, OP_MUL}, Tree_copy(nod), right);
+            }
+            else {
+
+                Node* res_left = nullptr;
+                {
+                    Node* new_exp = CreateNode(element{DOUBLE_OPERATOR, OP_SUB}, Tree_copy(nod->right), CreateNode(element{NUM, 1}));
+                    new_exp = CreateNode(element{DOUBLE_OPERATOR, OP_EXPONENT}, Tree_copy(nod->left), new_exp);
+
+                    res_left = CreateNode(element{DOUBLE_OPERATOR, OP_MUL}, Tree_copy(nod->right),
+                                        CreateNode(element{DOUBLE_OPERATOR, OP_MUL}, _diff_(nod->left, var_cod), new_exp));
+                }
+
+                Node* res_right = nullptr;
+                {
+                    Node* ln_arg = CreateNode(element{BIN_OPERATOR, OP_LN}, (Node*)nullptr, Tree_copy(nod->left));
+                    Node* right = CreateNode(element{DOUBLE_OPERATOR, OP_MUL}, ln_arg, _diff_(nod->right, var_cod));
+
+                    res_right = CreateNode(element{DOUBLE_OPERATOR, OP_MUL}, Tree_copy(nod), right);
+                }
+
+                result = CreateNode(element{DOUBLE_OPERATOR, OP_ADD}, res_left, res_right);
+            }
+        }
+        else { assert(0); }
+    }
+    else if (nod->$flag == BIN_OPERATOR) {
+
+        if (nod->$value == UN_MINUS) {
+            result = CreateNode(nod->value);
+            result->right = _diff_(nod->right, var_cod);
+        }
+        else if (nod->$value == OP_LN) {
+            result = CreateNode(element{DOUBLE_OPERATOR, OP_DIV}, _diff_(nod->right, var_cod), Tree_copy(nod->right));
+        }
+        else if (nod->$value == OP_SIN) {
+            Node* left = CreateNode(element{BIN_OPERATOR, OP_COS}, (Node*)nullptr, Tree_copy(nod->right));
+
+            result = CreateNode(element{DOUBLE_OPERATOR, OP_MUL}, left, _diff_(nod->right, var_cod));
+        }
+        else if (nod->$value == OP_COS) {
+
+        }
+    }
+
+    return result;
+}
+
+bool Expression::_is_const_(Node* nod, int not_const_var) {
+    if (nod == nullptr) {
+        return true;
+    }
+
+    bool is_const = true;
+    if (nod->$flag == VAR && nod->$value == not_const_var) {
+        is_const = false;
+    }
+
+    return is_const && _is_const_(nod->left, not_const_var) && _is_const_(nod->right, not_const_var);
+}
+
+
+
+
+
+
 
 /*
 
@@ -914,20 +1475,3 @@ void Expression::_simpler_case_sub_(Node *nod) {
 }
 */
 
-std::vector<element>::iterator
-Expression::_find_closing_bracket_(std::vector<element>::iterator it_begin, std::vector<element>::iterator it_end) {
-    std::vector<element>::iterator end_bracket;
-
-    int count_brackets = 0; //считая первую скобку
-    end_bracket = std::find_if(it_begin, it_end, [&count_brackets](const element &x) {
-        if (x.flag == NOT_OPERATOR && x.value == OPEN_BRACKET) {
-            count_brackets++;
-        }
-        if (x.flag == NOT_OPERATOR && x.value == CLOSE_BRACKET) {
-            count_brackets--;
-        }
-        return count_brackets == 0;
-    });
-
-    return end_bracket;
-}

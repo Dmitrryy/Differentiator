@@ -1,35 +1,52 @@
 #include <iostream>
+
 #include "Differentiator.h"
 
 #include <fstream>
-
-struct elem {
-    uint8_t flag;
-    int value;
-};
+#include <ctime>
 
 int main() {
 
-    std::stringstream in("((7 + 3) / ((y + 5) * (76 - 4)) + 5) * ch((sin(tg(1/x)) + 89) / (x + ctg(x + 8)))");
+    Expression exp1("-x");
+    Expression exp2("6 *(-3 / x)");
+    Expression exp3("((-x + 5) + 3)");
+    Expression empty;
 
+
+
+    exp3.OutExpression(std::cout);
+
+    //std::stringstream in("((((7 + 3) ^ 3 / ((y + 5) * (76 - 4))^90)^4 + 5) * (ch((arcsin(tg(1/x))) + 89) / (x + (ctg(x + 8)))^5))^(ctg(sin(sqrt(y/x))))");
+    /*std::stringstream in("((ln(x))^(x) / (sin(ln(x))))^(x)");
     Expression test;
 
+
     test.ReadExpression(in);
+
     test.OutExpression(std::cout);
+    Expression test2 = test.differentiation("x");*/
 
     std::ofstream file("tx1.tex");
     file   << "\\documentclass[12pt]{article}\n"
               "\\usepackage[russian]{babel}\n"
               "\\begin{document}\n"
               "{\n"
-              "$$ ";
+              "\\[ \n";
 
-    test.OutExpressionTeX(file);
+    exp3.OutExpressionTeX(file);
 
-    file   << " $$\n"
+    file   << "\n\\]\n"
               "}\n"
               "\\end{document}";
+
+    std::cout << std::endl;
+    //test2.OutExpression(std::cout);
+
+    //std::cout << std::endl << test.calculate({{"x", 10}, {"y", 5}});
+    //std::cout << std::endl << test.calculate();
 /*
+    test.clear();
+
     test.simplification();
 
     test.OutExpression(std::cout);
