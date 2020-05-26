@@ -1,12 +1,12 @@
 
-all: Differentiator.o LogEntry.o
-	g++ main.cpp Differentiator.o LogEntry.o -o main.o
+all: Differentiator.o LogEntry.o 
+	g++ main.cpp Differentiator.o LogEntry.o -o Differentiator.exe
 
-main.o:
-	gcc -c main.cpp Differentiator.cpp -o main.o	
+Differentiator.o:
+	gcc -c Differentiator.cpp -o Differentiator.o	
 	
 LogEntry.o:
 	gcc -c LogEntry.cpp -o LogEntry.o
 	
 clear:
-	rm *.o
+	del *.o
