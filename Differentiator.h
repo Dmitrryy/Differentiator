@@ -11,7 +11,7 @@
 
 #include "LogEntry.h"
 
-#define NOT_OPERATOR 33
+#define SPECIAL_CHARACTER 33
 #define DOUBLE_OPERATOR 10
 #define BIN_OPERATOR 100
 #define NUM 2
@@ -132,6 +132,8 @@ private:
     std::vector<element> _preprocessor_for_read_(std::istream& stream);
     element _coder_operator_(const std::string& _str);
 
+    Node<element>* _Get_();
+
     Node<element>* _read_(std::vector<element>& _str);
     Node<element>* _read_num_or_var_case_(std::vector<element>::iterator it_begin, std::vector<element>::iterator it_end);
     Node<element>* _read_add_or_sub_case_(std::vector<element>::iterator it_begin, std::vector<element>::iterator it_end, bool _unary = false);
@@ -151,13 +153,13 @@ private:
     Node<element>* _diff_(Node<element>* nod, int var_cod);
     bool _is_const_(Node<element>* nod, int not_const_var);
 
-    void _simpler_node_(Node<element>* nod);
+   /* void _simpler_node_(Node<element>* nod);
     void _simpler_case_mul_(Node<element>* nod);
     void _simpler_case_div_(Node<element>* nod);
     void _simpler_case_add_(Node<element>* nod);
     void _simpler_case_sub_(Node<element>* nod);
 
-    static std::string _get_str_(const std::string& _str_orig, const std::string _delim, size_t _pos = 0);
+    static std::string _get_str_(const std::string& _str_orig, const std::string _delim, size_t _pos = 0);*/
     static std::string _get_str_(std::istream& stream, const std::string& _delim = " \n\t");
     static bool _in_ (char _symbol, const std::string& _delim);
     static bool _is_digit_(const std::string& _str, double& _result);
@@ -166,6 +168,7 @@ private:
     Node<element>* root_orig;
     std::map<int, int> var_values;
     std::vector<std::string> var_data;
+
 
     const std::map<std::string, int> oper_to_cod = {$STRING_OPER_TO_COD$};
     const std::map<int, std::string> cod_to_oper = {$COD_TO_OPER_STRING$};

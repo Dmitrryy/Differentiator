@@ -148,7 +148,7 @@ std::vector<element> Expression::_preprocessor_for_read_(std::istream &stream) {
             stream.ignore(1);
         }
         else if (current_sign == '(' || current_sign == ')') {
-            result.push_back( {NOT_OPERATOR, static_cast<double>(current_sign)} );
+            result.push_back( {SPECIAL_CHARACTER, static_cast<double>(current_sign)} );
             stream.ignore(1);
         } else if (_in_(current_sign, "+-*/^")) {
             result.push_back({DOUBLE_OPERATOR, static_cast<double>(current_sign)});
@@ -159,7 +159,7 @@ std::vector<element> Expression::_preprocessor_for_read_(std::istream &stream) {
 
             if (!str_elem.empty()) {
                 element cod_elem = _coder_operator_(str_elem);
-                if (cod_elem.flag == NOT_OPERATOR) {
+                if (cod_elem.flag == SPECIAL_CHARACTER) {
 
                     double num = 0;
                     if (_is_digit_(str_elem, num)) {
@@ -237,7 +237,7 @@ element Expression::_coder_operator_(const std::string &_str) {
     auto it = oper_to_cod.find(_str);
 
     if (it == oper_to_cod.end()) {
-        return { NOT_OPERATOR, 0};
+        return {SPECIAL_CHARACTER, 0};
     }
     if (it->second >= BIN_OPERATOR) { //номер бинарной операции начинается со 100
         return {BIN_OPERATOR, static_cast<double>(it->second)};
@@ -263,7 +263,7 @@ Node *Expression::_read_(std::vector<element>& _str) {
     else if (_str[0].flag == BIN_OPERATOR) {
         result = _read_binary_case_(it_begin, it_end);
     }
-    else if (_str[0].flag == NOT_OPERATOR && _str[0].value == OPEN_BRACKET) {
+    else if (_str[0].flag == SPECIAL_CHARACTER && _str[0].value == OPEN_BRACKET) {
         result = _read_brackets_case_(it_begin, it_end);
     }
     else if (it_begin->flag == DOUBLE_OPERATOR && (it_begin->value == OP_SUB || it_begin->value == OP_ADD)) {
@@ -310,7 +310,7 @@ Node* Expression::_read_num_or_var_case_(std::vector<element>::iterator it_begin
         }
         else { assert(0); }
     }
-    else if (new_begin->flag == NOT_OPERATOR && new_begin->value == CLOSE_BRACKET) {
+    else if (new_begin->flag == SPECIAL_CHARACTER && new_begin->value == CLOSE_BRACKET) {
         result = num;
         num = nullptr;
     }
@@ -343,7 +343,7 @@ Node* Expression::_read_add_or_sub_case_(std::vector<element>::iterator it_begin
 
         assert(result->right != nullptr);
     }
-    else if (new_begin->flag == NOT_OPERATOR && new_begin->value == OPEN_BRACKET) {
+    else if (new_begin->flag == SPECIAL_CHARACTER && new_begin->value == OPEN_BRACKET) {
         Tree_connect(result, (Node*) nullptr, _read_brackets_case_(new_begin, it_end));
 
         assert(result->right != nullptr);
@@ -378,22 +378,18 @@ Node* Expression::_read_mul_or_div_case_(std::vector<element>::iterator it_begin
 
         if (tmp->$flag == DOUBLE_OPERATOR && (tmp->$value == OP_ADD || tmp->$value == OP_SUB)) {
             Tree_connect(result, (Node*) nullptr, tmp->left);
-            //result->right = tmp->left;
             Tree_connect(tmp, result);
-            //tmp->left = result;
             result = tmp;
         }
         else {
             Tree_connect(result, (Node*) nullptr, tmp);
-            //result->right = tmp;
         }
     }
-    else if (new_begin->flag == NOT_OPERATOR && new_begin->value == OPEN_BRACKET) {
+    else if (new_begin->flag == SPECIAL_CHARACTER && new_begin->value == OPEN_BRACKET) {
         auto new_end = _find_closing_bracket_(new_begin, it_end + 1);
         assert(new_end != it_end + 1);
 
         Tree_connect(result, (Node*) nullptr, _read_brackets_case_(new_begin, new_end));
-        //result->right = _read_brackets_case_(new_begin, new_end);
         assert(result->right != nullptr);
 
         //после скобок
@@ -406,7 +402,6 @@ Node* Expression::_read_mul_or_div_case_(std::vector<element>::iterator it_begin
                     assert(tmp != nullptr);
 
                     Tree_connect(tmp, (Node*) nullptr, result);
-                    //tmp->left = result;
                     result = tmp;
                     tmp = nullptr;
                 }
@@ -416,9 +411,6 @@ Node* Expression::_read_mul_or_div_case_(std::vector<element>::iterator it_begin
                 }
                 else if (new_begin->value == OP_EXPONENT) {
                     Tree_connect(result, (Node*) nullptr, _read_exponent_case_(new_begin, it_end, result->right));
-                    //Node* exp = _read_exponent_case_(new_begin, it_end, result->right);
-                    //assert(exp != nullptr);
-                    //result->right = exp;
                 }
                 else { throw std::runtime_error("in bracket case(after) value:" + std::to_string(new_begin->value)); }
             }else { throw std::runtime_error("in bracket case(after) flag:" + std::to_string(new_begin->flag)); }
@@ -432,13 +424,9 @@ Node* Expression::_read_mul_or_div_case_(std::vector<element>::iterator it_begin
             Tree_connect(result, (Node*) nullptr, tmp->left);
             Tree_connect(tmp, result);
             result = tmp;
-            //result->right = tmp->left;
-            //tmp->left = result;
-            //result = tmp;
         }
         else {
             Tree_connect(result, (Node*) nullptr, tmp);
-            //result->right = tmp;
         }
     }
     else { throw std::runtime_error("in _read_add_or_sub_case_, received: " + std::to_string(new_begin->flag)); }
@@ -459,7 +447,7 @@ Node* Expression::_read_brackets_case_  (std::vector<element>::iterator it_begin
 
     std::vector<element>::iterator end_bracket = _find_closing_bracket_(it_begin, it_end + 1);
 
-    if (end_bracket == it_end + 1 /*&& end_bracket->flag != NOT_OPERATOR && end_bracket->value != CLOSE_BRACKET*/) {
+    if (end_bracket == it_end + 1 /*&& end_bracket->flag != SPECIAL_CHARACTER && end_bracket->value != CLOSE_BRACKET*/) {
         throw std::runtime_error("Open bracket.");
     }
     end_bracket--;
@@ -474,7 +462,7 @@ Node* Expression::_read_brackets_case_  (std::vector<element>::iterator it_begin
         inside_brackets = _read_binary_case_(new_begin, end_bracket);
         assert(inside_brackets != nullptr);
     }
-    else if (new_begin->flag == NOT_OPERATOR && new_begin->value == OPEN_BRACKET) {
+    else if (new_begin->flag == SPECIAL_CHARACTER && new_begin->value == OPEN_BRACKET) {
         inside_brackets = _read_brackets_case_(new_begin, end_bracket);
         assert(inside_brackets != nullptr);
     }
@@ -535,10 +523,10 @@ Node* Expression::_read_binary_case_ (std::vector<element>::iterator it_begin, s
 
     //argument
     std::vector<element>::iterator end_bracket;
-    if (new_begin->flag == NOT_OPERATOR && new_begin->value == OPEN_BRACKET) {
+    if (new_begin->flag == SPECIAL_CHARACTER && new_begin->value == OPEN_BRACKET) {
 
         end_bracket = _find_closing_bracket_(new_begin, it_end);
-        if (end_bracket == it_end && end_bracket->flag != NOT_OPERATOR && end_bracket->value != CLOSE_BRACKET) {
+        if (end_bracket == it_end && end_bracket->flag != SPECIAL_CHARACTER && end_bracket->value != CLOSE_BRACKET) {
             throw std::runtime_error("Open bracket.");
         }
 
@@ -603,7 +591,7 @@ Node* Expression::_read_exponent_case_  (std::vector<element>::iterator it_begin
         exp->right = _read_binary_case_(new_begin, end_bin);
         new_begin = end_bin;
     }
-    else if (new_begin->flag == NOT_OPERATOR && new_begin->value == OPEN_BRACKET) {
+    else if (new_begin->flag == SPECIAL_CHARACTER && new_begin->value == OPEN_BRACKET) {
         auto end_br = _find_closing_bracket_(new_begin, it_end);
 
         exp->right = _read_brackets_case_(new_begin, end_br);
@@ -897,10 +885,10 @@ Expression::_find_closing_bracket_(std::vector<element>::iterator it_begin, std:
 
     int count_brackets = 0; //считая первую скобку
     end_bracket = std::find_if(it_begin, it_end, [&count_brackets](const element &x) {
-        if (x.flag == NOT_OPERATOR && x.value == OPEN_BRACKET) {
+        if (x.flag == SPECIAL_CHARACTER && x.value == OPEN_BRACKET) {
             count_brackets++;
         }
-        if (x.flag == NOT_OPERATOR && x.value == CLOSE_BRACKET) {
+        if (x.flag == SPECIAL_CHARACTER && x.value == CLOSE_BRACKET) {
             count_brackets--;
         }
         return count_brackets == 0;

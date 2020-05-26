@@ -31,7 +31,7 @@ void Delete(Node<T>* nod) {
 
 template <typename T>
 Node<T> *CreateNode(T _value, Node<T> *_left = nullptr, Node<T> *_right = nullptr, Node<T> *_parent = nullptr) {
-    Node<T>* result = new Node{_value, _left, _right, _parent};
+    Node<T>* result = new Node<T>{_value, _left, _right, _parent};
     if (_left != nullptr) {
         _left->parent = result;
     }
